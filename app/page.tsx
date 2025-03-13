@@ -30,7 +30,7 @@ const GeminiMessage = ({ text }: { text: string }) => (
     </Avatar>
     <div className="flex-1 space-y-2">
       <div className="flex items-center gap-2">
-        <p className="text-sm font-medium text-zinc-900">Gemini</p>
+        <p className="text-sm font-medium text-zinc-900">Assistant</p>
       </div>
       <div className="rounded-lg bg-white border border-zinc-200 px-3 py-2 text-sm text-zinc-800">
         {text}
@@ -71,7 +71,7 @@ export default function Home() {
         
         // On small screens, set a minimum height when in stacked layout
         if (window.innerWidth < 1024) { // lg breakpoint
-          chatContainerRef.current.style.minHeight = '50vh';
+          chatContainerRef.current.style.minHeight = '35vh';
         } else {
           chatContainerRef.current.style.minHeight = 'auto';
         }
@@ -91,14 +91,14 @@ export default function Home() {
 
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col min-h-screen">
-      <header className="py-6 px-4 sm:px-6 md:px-8 border-b border-zinc-200 bg-white shrink-0">
-        <h1 className="text-2xl sm:text-3xl font-bold text-zinc-800">
+      <header className="py-4 px-4 sm:py-6 sm:px-6 md:px-8 border-b border-zinc-200 bg-white shrink-0">
+        <h1 className="text-xl sm:text-3xl font-bold text-zinc-800">
           Gemini Live Chat
         </h1>
-        <p className="text-zinc-500 mt-1">Talk with Gemini using your camera and microphone</p>
+        <p className="text-sm sm:text-base text-zinc-500 mt-1">Talk with Gemini using your camera and microphone</p>
       </header>
       
-      <main className="p-4 sm:p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-6 bg-zinc-50 flex-grow">
+      <main className="p-3 sm:p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 sm:gap-6 bg-zinc-50 flex-grow">
         {/* Camera Preview */}
         <div className="flex justify-center lg:max-h-screen">
           <CameraPreview onTranscription={handleTranscription} />
@@ -107,14 +107,14 @@ export default function Home() {
         {/* Chat Messages */}
         <div 
           ref={chatContainerRef}
-          className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col h-full max-h-[calc(100vh-10rem)] lg:max-h-[80vh]"
+          className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col h-full max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-10rem)] lg:max-h-[80vh]"
         >
-          <div className="p-4 border-b border-zinc-100 bg-gradient-to-r from-blue-50 to-indigo-50 shrink-0">
-            <h2 className="font-semibold text-zinc-900">Chat Messages</h2>
+          <div className="p-3 sm:p-4 border-b border-zinc-100 bg-gradient-to-r from-blue-50 to-indigo-50 shrink-0">
+            <h2 className="font-semibold text-zinc-900">Chat Transcript</h2>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            <GeminiMessage text="Hi! I'm Gemini. I can see and hear you. Let's chat!" />
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 sm:space-y-6">
+            <GeminiMessage text="Hi! I'm your AI assistant. I can see and hear you. Let's chat!" />
             {messages.map((message, index) => (
               message.type === 'human' ? (
                 <HumanMessage key={`msg-${index}`} text={message.text} />

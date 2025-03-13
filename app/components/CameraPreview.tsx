@@ -364,7 +364,7 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
 
   return (
     <div className="space-y-4 w-full max-w-[640px]">
-      <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-lg">
+      <div className="relative sm:aspect-video aspect-[7/8] bg-black rounded-lg overflow-hidden shadow-lg">
         <video
           ref={videoRef}
           autoPlay
