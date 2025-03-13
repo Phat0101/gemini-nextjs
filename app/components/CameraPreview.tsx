@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 // import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { Video, VideoOff } from "lucide-react";
+import { Video, VideoOff, FlipHorizontal, Loader2 } from "lucide-react";
 import { GeminiWebSocket } from '../services/geminiWebSocket';
 import { Base64 } from 'js-base64';
 // import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -29,6 +29,27 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
   const [isModelSpeaking, setIsModelSpeaking] = useState(false);
   const [outputAudioLevel, setOutputAudioLevel] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [isCameraSupported, setIsCameraSupported] = useState(true);
+
+  // Check if device has multiple cameras
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
+
+  useEffect(() => {
+    // Check if the device is likely a mobile device with multiple cameras
+    if (typeof navigator !== 'undefined' && 
+        typeof navigator.mediaDevices !== 'undefined' && 
+        navigator.mediaDevices.enumerateDevices) {
+      navigator.mediaDevices.enumerateDevices()
+        .then(devices => {
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          setHasMultipleCameras(videoDevices.length > 1);
+        })
+        .catch(err => {
+          console.error("Error checking camera devices:", err);
+        });
+    }
+  }, []);
 
   const cleanupAudio = useCallback(() => {
     if (audioWorkletNodeRef.current) {
@@ -54,6 +75,52 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
     geminiWsRef.current.sendMediaChunk(b64Data, "audio/pcm");
   };
 
+  const flipCamera = async () => {
+    if (!isStreaming || !stream) return;
+    
+    // Stop current stream
+    stream.getTracks().forEach(track => track.stop());
+    
+    // Toggle facing mode
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+    
+    try {
+      // Get new video stream with flipped camera
+      const videoStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: newFacingMode
+        },
+        audio: false
+      });
+      
+      // Keep audio stream the same
+      const audioStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: 16000,
+          channelCount: 1,
+          echoCancellation: true,
+          autoGainControl: true,
+          noiseSuppression: true,
+        }
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = videoStream;
+      }
+      
+      const combinedStream = new MediaStream([
+        ...videoStream.getTracks(),
+        ...audioStream.getTracks()
+      ]);
+      
+      setStream(combinedStream);
+    } catch (err) {
+      console.error('Error flipping camera:', err);
+      setIsCameraSupported(false);
+    }
+  };
+
   const toggleCamera = async () => {
     if (isStreaming && stream) {
       setIsStreaming(false);
@@ -67,7 +134,11 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
     } else {
       try {
         const videoStream = await navigator.mediaDevices.getUserMedia({ 
-          video: true,
+          video: {
+            facingMode: facingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
           audio: false
         });
 
@@ -99,6 +170,7 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
         setIsStreaming(true);
       } catch (err) {
         console.error('Error accessing media devices:', err);
+        setIsCameraSupported(false);
         cleanupAudio();
       }
     }
@@ -263,47 +335,74 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
     geminiWsRef.current.sendMediaChunk(b64Data, "image/jpeg");
   };
 
+  if (!isCameraSupported) {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-4 p-6 bg-red-50 rounded-lg border border-red-200 text-center">
+        <div className="text-red-500 text-xl font-medium">Camera not supported</div>
+        <p className="text-red-700">Your device doesn&apos;t support the camera features needed for this app.</p>
+        <Button onClick={() => setIsCameraSupported(true)} variant="outline">Try Again</Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="relative">
+    <div className="space-y-4 w-full max-w-[640px]">
+      <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-lg">
         <video
           ref={videoRef}
           autoPlay
           playsInline
-          className="w-[640px] h-[480px] bg-muted rounded-lg overflow-hidden"
+          className="absolute inset-0 w-full h-full object-cover"
         />
         
         {/* Connection Status Overlay */}
         {isStreaming && connectionStatus !== 'connected' && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg backdrop-blur-sm">
-            <div className="text-center space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto" />
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg backdrop-blur-sm z-10">
+            <div className="text-center space-y-3">
+              <Loader2 className="animate-spin h-8 w-8 text-white mx-auto" />
               <p className="text-white font-medium">
                 {connectionStatus === 'connecting' ? 'Connecting to Gemini...' : 'Disconnected'}
               </p>
-              <p className="text-white/70 text-sm">
+              <p className="text-white/70 text-sm px-4">
                 Please wait while we establish a secure connection
               </p>
             </div>
           </div>
         )}
 
-        <Button
-          onClick={toggleCamera}
-          size="icon"
-          className={`absolute left-1/2 bottom-4 -translate-x-1/2 rounded-full w-12 h-12 backdrop-blur-sm transition-colors
-            ${isStreaming 
-              ? 'bg-red-500/50 hover:bg-red-500/70 text-white' 
-              : 'bg-green-500/50 hover:bg-green-500/70 text-white'
-            }`}
-        >
-          {isStreaming ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
-        </Button>
+        {/* Camera controls */}
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4 z-20">
+          {/* Main camera toggle button */}
+          <Button
+            onClick={toggleCamera}
+            size="icon"
+            className={`rounded-full w-14 h-14 shadow-lg transition-colors
+              ${isStreaming 
+                ? 'bg-red-500 hover:bg-red-600 text-white' 
+                : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+              }`}
+          >
+            {isStreaming ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+          </Button>
+          
+          {/* Camera flip button - only show when streaming and device has multiple cameras */}
+          {isStreaming && hasMultipleCameras && (
+            <Button
+              onClick={flipCamera}
+              size="icon"
+              className="rounded-full w-10 h-10 bg-white/30 hover:bg-white/50 backdrop-blur-sm text-white shadow-lg"
+            >
+              <FlipHorizontal className="h-5 w-5" />
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Audio level indicator */}
       {isStreaming && (
-        <div className="w-[640px] h-2 rounded-full bg-green-100">
+        <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
           <div
-            className="h-full rounded-full transition-all bg-green-500"
+            className="h-full rounded-full transition-all bg-gradient-to-r from-emerald-400 to-emerald-600"
             style={{ 
               width: `${isModelSpeaking ? outputAudioLevel : audioLevel}%`,
               transition: 'width 100ms ease-out'
@@ -311,6 +410,7 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
           />
         </div>
       )}
+      
       <canvas ref={videoCanvasRef} className="hidden" />
     </div>
   );
