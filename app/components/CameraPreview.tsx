@@ -78,7 +78,7 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
   const flipCamera = async () => {
     if (!isStreaming || !stream) return;
     
-    // Stop current stream
+    // Stop all current tracks
     stream.getTracks().forEach(track => track.stop());
     
     // Toggle facing mode
@@ -89,12 +89,14 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
       // Get new video stream with flipped camera
       const videoStream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: newFacingMode
+          facingMode: newFacingMode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         },
         audio: false
       });
       
-      // Keep audio stream the same
+      // Create new audio stream with the desired settings
       const audioStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
@@ -105,16 +107,22 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
         }
       });
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = videoStream;
-      }
-      
+      // Create new combined stream with both video and audio
       const combinedStream = new MediaStream([
         ...videoStream.getTracks(),
         ...audioStream.getTracks()
       ]);
       
+      if (videoRef.current) {
+        videoRef.current.srcObject = videoStream;
+        videoRef.current.muted = true;
+      }
+      
       setStream(combinedStream);
+      
+      // Reset audio processing to ensure it uses the new stream
+      setIsAudioSetup(false);
+      
     } catch (err) {
       console.error('Error flipping camera:', err);
       setIsCameraSupported(false);
@@ -236,6 +244,8 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
 
     let isActive = true;
     setupInProgressRef.current = true;
+    
+    console.log("[Camera] Setting up audio processing with facing mode:", facingMode);
 
     const setupAudioProcessing = async () => {
       try {
@@ -243,6 +253,12 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
         if (!ctx || ctx.state === 'closed' || !isActive) {
           setupInProgressRef.current = false;
           return;
+        }
+
+        // Disconnect any existing nodes
+        if (audioWorkletNodeRef.current) {
+          audioWorkletNodeRef.current.disconnect();
+          audioWorkletNodeRef.current = null;
         }
 
         if (ctx.state === 'suspended') {
@@ -282,6 +298,7 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
         source.connect(audioWorkletNodeRef.current);
         setIsAudioSetup(true);
         setupInProgressRef.current = false;
+        console.log("[Camera] Audio processing setup complete for facing mode:", facingMode);
 
         return () => {
           source.disconnect();
@@ -312,7 +329,7 @@ export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
         audioWorkletNodeRef.current = null;
       }
     };
-  }, [isStreaming, stream, isWebSocketReady, isModelSpeaking]);
+  }, [isStreaming, stream, isWebSocketReady, isModelSpeaking, facingMode]);
 
   // Capture and send image
   const captureAndSendImage = () => {
