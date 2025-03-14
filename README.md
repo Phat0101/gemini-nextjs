@@ -2,8 +2,6 @@
 
 A demonstration project showing how to build a realtime multimodal application using Google's Gemini 2.0 API and Next.js. This app can process audio, video, and generate transcripts in realtime.
 
-![Watch Demo Video](./thumbnail.jpg)
-
 [Watch the Tutorial Video](https://youtu.be/YUfer6xyExY)
 
 ## Features
@@ -42,7 +40,7 @@ cp .env.example .env.local
 ```
 Add your Gemini API key to `.env.local`:
 ```
-GEMINI_API_KEY=your_api_key_here
+NEXT_PUBLIC_GEMINI_API_KEY=your_api_key_here
 ```
 
 4. Run the development server

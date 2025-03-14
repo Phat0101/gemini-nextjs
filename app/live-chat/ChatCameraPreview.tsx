@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 // import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Video, VideoOff, FlipHorizontal, Loader2 } from "lucide-react";
-import { GeminiWebSocket } from '../services/geminiWebSocket';
+import { GeminiWebSocket } from '../services/chatGeminiWebSocket';
 import { Base64 } from 'js-base64';
 // import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
@@ -13,7 +13,7 @@ interface CameraPreviewProps {
   onTranscription: (text: string) => void;
 }
 
-export default function CameraPreview({ onTranscription }: CameraPreviewProps) {
+export default function ChatCameraPreview({ onTranscription }: CameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);

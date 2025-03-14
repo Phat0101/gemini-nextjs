@@ -1,5 +1,5 @@
 // import { Base64 } from 'js-base64'; 
-import { TranscriptionService } from './transcriptionService';
+import { TranscriptionService } from './chatTranscriptionService';
 import { pcmToWav } from '../utils/audioUtils';
 
 const MODEL = "models/gemini-2.0-flash-exp";
