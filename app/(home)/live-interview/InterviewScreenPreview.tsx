@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Button } from "../../components/ui/button";
+import { Button } from "../../../components/ui/button";
 import { ScreenShare, Loader2, StopCircle, Mic } from "lucide-react";
-import { InterviewGeminiWebSocket } from '../services/interviewGeminiWebSocket';
+import { InterviewGeminiWebSocket } from '../../services/interviewGeminiWebSocket';
 import { Base64 } from 'js-base64';
 
 interface ScreenCameraPreviewProps {
   onTranscription: (text: string) => void;
   onModelResponse: (text: string) => void;
+  onStatusChange?: (status: { isStreaming: boolean; isScreenSharing: boolean; isAudioOnly: boolean }) => void;
 }
 
-export default function InterviewScreenPreview({ onTranscription, onModelResponse }: ScreenCameraPreviewProps) {
+export default function InterviewScreenPreview({ onTranscription, onModelResponse, onStatusChange }: ScreenCameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -138,7 +139,16 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
       setIsAudioOnly(false);
     } catch (err) {
       console.error('Error accessing media devices:', err);
-      setIsCaptureSupported(false);
+      
+      // Check if this is a permission error (user cancelled) vs. a support error
+      if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
+        // User denied permission or cancelled the selection - don't mark device as unsupported
+        console.log('User cancelled screen sharing selection');
+      } else {
+        // This might be a true capability issue
+        setIsCaptureSupported(false);
+      }
+      
       cleanupAudio();
     }
   };
@@ -170,7 +180,7 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
     geminiWsRef.current = new InterviewGeminiWebSocket(
       (text) => {
         // Handle model text responses
-        console.log("Received text from Gemini:", text);
+        console.log("Received text from AI:", text);
         onModelResponse(text);
       },
       () => {
@@ -323,6 +333,11 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
     geminiWsRef.current.sendMediaChunk(b64Data, "image/jpeg");
   };
 
+  // Emit status changes to parent component
+  useEffect(() => {
+    onStatusChange?.({ isStreaming, isScreenSharing, isAudioOnly });
+  }, [isStreaming, isScreenSharing, isAudioOnly, onStatusChange]);
+
   if (!isCaptureSupported) {
     return (
       <div className="flex flex-col items-center justify-center space-y-4 p-6 bg-red-50 rounded-lg border border-red-200 text-center">
@@ -361,7 +376,7 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
             <div className="text-center space-y-3">
               <Loader2 className="animate-spin h-8 w-8 text-white mx-auto" />
               <p className="text-white font-medium">
-                {connectionStatus === 'connecting' ? 'Connecting to Gemini...' : 'Disconnected'}
+                {connectionStatus === 'connecting' ? 'Connecting to AI...' : 'Disconnected'}
               </p>
               <p className="text-white/70 text-sm px-4">
                 Please wait while we establish a secure connection

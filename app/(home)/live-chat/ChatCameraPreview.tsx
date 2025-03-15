@@ -3,9 +3,9 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 // import { Card, CardContent } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
+import { Button } from "../../../components/ui/button";
 import { Video, VideoOff, FlipHorizontal, Loader2 } from "lucide-react";
-import { GeminiWebSocket } from '../services/chatGeminiWebSocket';
+import { GeminiWebSocket } from '../../services/chatGeminiWebSocket';
 import { Base64 } from 'js-base64';
 // import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
@@ -194,7 +194,7 @@ export default function ChatCameraPreview({ onTranscription }: CameraPreviewProp
     setConnectionStatus('connecting');
     geminiWsRef.current = new GeminiWebSocket(
       (text) => {
-        console.log("Received from Gemini:", text);
+        console.log("Received from AI:", text);
       },
       () => {
         console.log("[Camera] WebSocket setup complete, starting media capture");
@@ -378,7 +378,7 @@ export default function ChatCameraPreview({ onTranscription }: CameraPreviewProp
             <div className="text-center space-y-3">
               <Loader2 className="animate-spin h-8 w-8 text-white mx-auto" />
               <p className="text-white font-medium">
-                {connectionStatus === 'connecting' ? 'Connecting to Gemini...' : 'Disconnected'}
+                {connectionStatus === 'connecting' ? 'Connecting to AI...' : 'Disconnected'}
               </p>
               <p className="text-white/70 text-sm px-4">
                 Please wait while we establish a secure connection

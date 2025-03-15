@@ -42,15 +42,15 @@ const UserMessage = ({ text }: { text: string }) => (
 );
 
 const AIMessage = ({ text }: { text: string }) => (
-  <div className="flex gap-3 items-start">
-    <Avatar className="h-8 w-8 bg-blue-600">
+  <div className="flex gap-2 items-start">
+    {/* <Avatar className="h-8 w-8 bg-blue-600">
       <AvatarImage src="/avatars/gemini.png" alt="Gemini" />
       <AvatarFallback>AI</AvatarFallback>
-    </Avatar>
+    </Avatar> */}
     <div className="flex-1 space-y-2">
-      <div className="flex items-center gap-2">
+      {/* <div className="flex items-center gap-2">
         <p className="text-sm font-medium text-zinc-900">Assistant</p>
-      </div>
+      </div> */}
       <div className="rounded-lg bg-white border border-zinc-200 px-3 py-2 text-sm text-zinc-800">
         <MarkdownPreview source={text} className="!bg-transparent !p-0" style={markdownStyle} />
       </div>
@@ -80,6 +80,11 @@ export default function InterviewPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isPreviewVisible, setIsPreviewVisible] = useState(true);
+  const [streamingStatus, setStreamingStatus] = useState({
+    isStreaming: false,
+    isScreenSharing: false,
+    isAudioOnly: false
+  });
   
   const handleTranscription = useCallback((transcription: string) => {
     if (transcription.trim()) {
@@ -107,6 +112,14 @@ export default function InterviewPage() {
       // Otherwise, add a completely new message
       return [...prev, { type: 'ai', text: response }];
     });
+  }, []);
+  
+  const handleStreamingStatusChange = useCallback((status: { 
+    isStreaming: boolean; 
+    isScreenSharing: boolean; 
+    isAudioOnly: boolean 
+  }) => {
+    setStreamingStatus(status);
   }, []);
   
   // Auto-scroll to bottom when new messages arrive
@@ -188,13 +201,14 @@ export default function InterviewPage() {
           <InterviewScreenPreview 
             onTranscription={handleTranscription}
             onModelResponse={handleModelResponse}
+            onStatusChange={handleStreamingStatusChange}
           />
         </div>
 
         {/* Chat Messages - takes full width when preview is hidden */}
         <div 
           ref={chatContainerRef}
-          className={`bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col h-full max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-10rem)] lg:max-h-[80vh] ${!isPreviewVisible ? 'lg:col-span-1 mx-auto w-full max-w-5xl' : ''}`}
+          className={`bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col h-full max-h-[calc(100vh-12rem)] sm:max-h-[calc(100vh-10rem)] lg:max-h-[80vh] ${!isPreviewVisible ? 'lg:col-span-1 mx-auto w-full max-w-6xl' : ''}`}
         >
           <div className="p-3 sm:p-4 border-b border-zinc-100 bg-gradient-to-r from-blue-50 to-indigo-50 shrink-0">
             <div className="flex items-center justify-between">
@@ -221,10 +235,24 @@ export default function InterviewPage() {
         </div>
 
         {/* Hidden preview indicator when preview is not visible */}
-        {!isPreviewVisible && (
+        {!isPreviewVisible && streamingStatus.isStreaming && (
           <div className="fixed bottom-4 right-4 bg-blue-600 text-white rounded-full p-3 shadow-lg z-20 flex items-center gap-2">
-            <ScreenShare className="h-5 w-5" />
-            <span className="text-sm font-medium">Screen Sharing Active</span>
+            {streamingStatus.isScreenSharing ? (
+              <>
+                <ScreenShare className="h-5 w-5" />
+                <span className="text-sm font-medium">Screen Sharing Active</span>
+              </>
+            ) : streamingStatus.isAudioOnly ? (
+              <>
+                <Mic className="h-5 w-5" />
+                <span className="text-sm font-medium">Audio Only Mode Active</span>
+              </>
+            ) : (
+              <>
+                <ScreenShare className="h-5 w-5" />
+                <span className="text-sm font-medium">Preparing Stream...</span>
+              </>
+            )}
           </div>
         )}
       </main>
