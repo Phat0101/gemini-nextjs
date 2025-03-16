@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model File {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relation fields
+  user         User?    @relation(fields: [userId], references: [id])
+  userId       String?  @unique @db.ObjectId
+}
+
+model JobPreparation {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  company     String
+  description String
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relation fields
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String   @db.ObjectId
+  
+  // Reference to sessions
+  interviewSessions InterviewSession[]
+}
+
+model InterviewSession {
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  startTime       DateTime
+  endTime         DateTime?
+  duration        Int             @default(0) // in minutes
+  creditsUsed     Float           @default(0)
+  status          InterviewStatus @default(scheduled)
+  transcript      String?
+  feedback        String?
+  recordingUrl    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  
+  // Relation fields
+  jobPreparation  JobPreparation  @relation(fields: [jobPreparationId], references: [id])
+  jobPreparationId String         @db.ObjectId
+  
+  user            User            @relation(fields: [userId], references: [id])
+  userId          String          @db.ObjectId
+}
+
+enum InterviewStatus {
+  scheduled
+  in_progress     @map("in-progress")
+  completed
+  cancelled
+}
+
+model Subscription {
+  id                    String             @id @default(auto()) @map("_id") @db.ObjectId
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  stripePriceId         String?
+  stripeCurrentPeriodEnd DateTime?
+  plan                  SubscriptionPlan   @default(free)
+  status                SubscriptionStatus @default(active)
+  cancelAtPeriodEnd     Boolean            @default(false)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  
+  // Relation fields - one-to-one with User
+  user                  User               @relation(fields: [userId], references: [id])
+  userId                String             @unique @db.ObjectId
+}
+
+enum SubscriptionPlan {
+  free
+  basic
+  premium
+}
+
+enum SubscriptionStatus {
+  active
+  canceled
+  incomplete
+  incomplete_expired
+  past_due
+  trialing
+  unpaid
+}
+
+model User {
+  id                 String        @id @default(auto()) @map("_id") @db.ObjectId
+  clerkId            String        @unique
+  email              String        @unique
+  firstName          String?
+  lastName           String?
+  profileImageUrl    String?
+  
+  // User Data
+  resume             File?
+  credits            Float         @default(0)
+  jobPreparations    JobPreparation[]
+  interviewSessions  InterviewSession[]
+  subscription       Subscription?
+  
+  // Metadata
+  lastActive         DateTime      @default(now())
+  notifications      Boolean       @default(true)
+  emailMarketing     Boolean       @default(true)
+  emailUpdates       Boolean       @default(true)
+  emailReminders     Boolean       @default(true)
+  timezone           String        @default("UTC")
+  
+  // Timestamps
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  
+  @@map("users")
+} 

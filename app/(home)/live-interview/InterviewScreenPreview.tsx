@@ -10,9 +10,17 @@ interface ScreenCameraPreviewProps {
   onTranscription: (text: string) => void;
   onModelResponse: (text: string) => void;
   onStatusChange?: (status: { isStreaming: boolean; isScreenSharing: boolean; isAudioOnly: boolean }) => void;
+  userCredits?: number;
+  onCreditUpdate?: (newCredits: number) => void;
 }
 
-export default function InterviewScreenPreview({ onTranscription, onModelResponse, onStatusChange }: ScreenCameraPreviewProps) {
+export default function InterviewScreenPreview({ 
+  onTranscription, 
+  onModelResponse, 
+  onStatusChange,
+  userCredits = 0,
+  onCreditUpdate
+}: ScreenCameraPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -29,6 +37,14 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
   const [isCaptureSupported, setIsCaptureSupported] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isAudioOnly, setIsAudioOnly] = useState(false);
+  
+  // Credit tracking state
+  const [interviewDuration, setInterviewDuration] = useState(0);
+  const [lastDeductionMinute, setLastDeductionMinute] = useState(0);
+  const creditDeductionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionStartTimeRef = useRef<Date | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [creditError, setCreditError] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if the browser supports screen capture
@@ -63,7 +79,183 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
     geminiWsRef.current.sendMediaChunk(b64Data, "audio/pcm");
   };
 
+  // Start an interview session by calling the API
+  const startInterviewSession = async () => {
+    try {
+      // First try to find or create a job preparation
+      const prepResponse = await fetch('/api/job-preparation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'General Interview Practice',
+          company: 'Practice Session',
+          description: 'General interview practice session',
+          notes: 'Auto-created for interview practice'
+        }),
+      });
+      
+      if (!prepResponse.ok) {
+        console.error('Failed to create job preparation');
+        setCreditError('Failed to set up interview. Please try again.');
+        return null;
+      }
+      
+      const prepData = await prepResponse.json();
+      const jobPreparationId = prepData.data.id;
+      
+      // Now start the interview session with the created job preparation
+      const response = await fetch('/api/interview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jobPreparationId
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to start interview session:', errorData);
+        setCreditError(errorData.error || 'Failed to start interview');
+        return null;
+      }
+
+      const data = await response.json();
+      sessionStartTimeRef.current = new Date();
+      return data.data.sessionId;
+    } catch (error) {
+      console.error('Error starting interview session:', error);
+      setCreditError('Failed to start interview. Please try again.');
+      return null;
+    }
+  };
+
+  // End the interview session and get final credit usage
+  const endInterviewSession = async () => {
+    if (!sessionId) return;
+
+    try {
+      const response = await fetch('/api/interview', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to end interview session');
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Interview session ended:', data);
+      
+      // Update credits in parent component
+      if (onCreditUpdate && typeof data.data.remainingCredits === 'number') {
+        onCreditUpdate(data.data.remainingCredits);
+      }
+      
+      setSessionId(null);
+      sessionStartTimeRef.current = null;
+      setInterviewDuration(0);
+      setLastDeductionMinute(0);
+    } catch (error) {
+      console.error('Error ending interview session:', error);
+    }
+  };
+
+  // Deduct credits for the time used
+  const deductCreditsForTime = async (minutes: number) => {
+    try {
+      if (minutes <= 0) return;
+      
+      const response = await fetch('/api/interview', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          minutes,
+        }),
+      });
+
+      if (response.status === 402) {
+        // Payment required - user has run out of credits
+        setCreditError('You have run out of credits. The interview will end shortly.');
+        setTimeout(stopStreaming, 5000); // Give user 5 seconds to read the message
+        return;
+      }
+      
+      if (!response.ok) {
+        console.error('Failed to deduct credits');
+        return;
+      }
+
+      const data = await response.json();
+      console.log(`Deducted credits for ${minutes} minutes:`, data);
+      
+      // Update credits in parent component
+      if (onCreditUpdate && typeof data.data.remainingCredits === 'number') {
+        onCreditUpdate(data.data.remainingCredits);
+      }
+    } catch (error) {
+      console.error('Error deducting credits:', error);
+    }
+  };
+
+  // Track interview time and deduct credits
+  useEffect(() => {
+    if (!isStreaming || !sessionId) return;
+
+    // Set up timer to track interview duration and deduct credits every minute
+    const timer = setInterval(() => {
+      if (!sessionStartTimeRef.current) return;
+      
+      const now = new Date();
+      const elapsedSeconds = Math.floor((now.getTime() - sessionStartTimeRef.current.getTime()) / 1000);
+      const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+      
+      setInterviewDuration(elapsedMinutes);
+      
+      // Deduct credits every minute
+      if (elapsedMinutes > lastDeductionMinute) {
+        const minutesToDeduct = elapsedMinutes - lastDeductionMinute;
+        setLastDeductionMinute(elapsedMinutes);
+        deductCreditsForTime(minutesToDeduct);
+      }
+    }, 10000); // Check every 10 seconds
+    
+    creditDeductionTimerRef.current = timer;
+    
+    return () => {
+      if (creditDeductionTimerRef.current) {
+        clearInterval(creditDeductionTimerRef.current);
+        creditDeductionTimerRef.current = null;
+      }
+    };
+  }, [isStreaming, sessionId, lastDeductionMinute]);
+
   const startAudioOnly = async () => {
+    if (userCredits <= 0) {
+      setCreditError('You do not have enough credits to start an interview');
+      return;
+    }
+    
+    setCreditError(null);
+    const newSessionId = await startInterviewSession();
+    if (!newSessionId) {
+      console.error('Failed to start session');
+      return;
+    }
+    
+    setSessionId(newSessionId);
+    
     try {
       // Request audio only
       const audioStream = await navigator.mediaDevices.getUserMedia({
@@ -87,10 +279,28 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
     } catch (err) {
       console.error('Error accessing audio devices:', err);
       cleanupAudio();
+      // Cleanup the session if we fail to get audio
+      if (newSessionId) {
+        endInterviewSession();
+      }
     }
   };
 
   const startScreenAndAudio = async () => {
+    if (userCredits <= 0) {
+      setCreditError('You do not have enough credits to start an interview');
+      return;
+    }
+    
+    setCreditError(null);
+    const newSessionId = await startInterviewSession();
+    if (!newSessionId) {
+      console.error('Failed to start session');
+      return;
+    }
+    
+    setSessionId(newSessionId);
+    
     try {
       // Request screen capture
       const displayStream = await navigator.mediaDevices.getDisplayMedia({ 
@@ -150,10 +360,20 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
       }
       
       cleanupAudio();
+      
+      // Cleanup the session if we fail to get media
+      if (newSessionId) {
+        endInterviewSession();
+      }
     }
   };
 
   const stopStreaming = () => {
+    // End the interview session and deduct final credits
+    if (sessionId) {
+      endInterviewSession();
+    }
+    
     setIsStreaming(false);
     setIsScreenSharing(false);
     setIsAudioOnly(false);
@@ -166,6 +386,12 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
         videoRef.current.srcObject = null;
       }
       setStream(null);
+    }
+    
+    // Clear any timers
+    if (creditDeductionTimerRef.current) {
+      clearInterval(creditDeductionTimerRef.current);
+      creditDeductionTimerRef.current = null;
     }
   };
 
@@ -338,6 +564,19 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
     onStatusChange?.({ isStreaming, isScreenSharing, isAudioOnly });
   }, [isStreaming, isScreenSharing, isAudioOnly, onStatusChange]);
 
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (isStreaming && sessionId) {
+        endInterviewSession();
+      }
+      
+      if (creditDeductionTimerRef.current) {
+        clearInterval(creditDeductionTimerRef.current);
+      }
+    };
+  }, [isStreaming, sessionId]);
+
   if (!isCaptureSupported) {
     return (
       <div className="flex flex-col items-center justify-center space-y-4 p-6 bg-red-50 rounded-lg border border-red-200 text-center">
@@ -359,6 +598,11 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
               <p className="text-white/80 text-sm max-w-xs mx-auto">
                 Your microphone is active. Speak clearly to get interview help.
               </p>
+              {interviewDuration > 0 && (
+                <div className="mt-3 text-white/90 text-sm font-medium">
+                  Interview time: {interviewDuration} minutes
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -368,6 +612,15 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
             playsInline
             className="absolute inset-0 w-full h-full object-contain"
           />
+        )}
+        
+        {/* Credit Error Message */}
+        {creditError && (
+          <div className="absolute inset-0 bg-red-900/80 flex items-center justify-center rounded-lg backdrop-blur-sm z-30">
+            <div className="text-center p-4 bg-white/10 backdrop-blur-md rounded-lg max-w-xs mx-auto">
+              <p className="text-white font-medium">{creditError}</p>
+            </div>
+          </div>
         )}
         
         {/* Connection Status Overlay */}
@@ -385,6 +638,13 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
           </div>
         )}
 
+        {/* Interview duration display */}
+        {isStreaming && interviewDuration > 0 && connectionStatus === 'connected' && (
+          <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm px-2 py-1 rounded text-white text-xs z-20">
+            {interviewDuration} min
+          </div>
+        )}
+
         {/* Controls */}
         <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-3 z-20">
           {isStreaming ? (
@@ -399,14 +659,16 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
             <>
               <Button
                 onClick={startAudioOnly}
-                className="rounded-full h-12 px-4 shadow-lg bg-indigo-500 hover:bg-indigo-600 text-white flex items-center gap-2"
+                disabled={userCredits <= 0}
+                className="rounded-full h-12 px-4 shadow-lg bg-indigo-500 hover:bg-indigo-600 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Mic className="h-5 w-5" />
                 <span>Audio Only</span>
               </Button>
               <Button
                 onClick={startScreenAndAudio}
-                className="rounded-full h-12 px-4 shadow-lg bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
+                disabled={userCredits <= 0}
+                className="rounded-full h-12 px-4 shadow-lg bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ScreenShare className="h-5 w-5" />
                 <span>Screen + Audio</span>
@@ -431,6 +693,8 @@ export default function InterviewScreenPreview({ onTranscription, onModelRespons
 
       <div className="text-sm text-center text-zinc-500">
         {!isStreaming ? (
+          userCredits <= 0 ? 
+          "You need to purchase more credits to start an interview." :
           "Choose a mode to get started with your interview."
         ) : isAudioOnly ? (
           "Audio-only mode is active. Speak clearly to get interview help."

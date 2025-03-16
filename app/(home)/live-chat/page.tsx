@@ -92,11 +92,11 @@ export default function LiveChat() {
 
   return (
     <div className="w-full h-full">
-      <header className="py-4 px-4 sm:py-6 sm:px-6 border-b border-zinc-200 bg-white text-center">
+      <header className="py-4 px-4 sm:py-6 sm:px-6 border-zinc-200 bg-white text-center">
         <h1 className="text-xl sm:text-2xl font-bold text-zinc-800">
           Live Chat
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">Talk with Gemini using your camera and microphone</p>
+        <p className="text-sm text-zinc-500 mt-1">Talk with AI using your camera and microphone</p>
       </header>
       
       <main className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 bg-zinc-50">

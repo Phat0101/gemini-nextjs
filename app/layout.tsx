@@ -7,8 +7,8 @@ import { ClerkProvider } from '@clerk/nextjs';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Gemini App',
-  description: 'Interact with Gemini AI using your camera and microphone',
+  title: 'AI Interview Partner',
+  description: 'Ace your interview with the help of cutting-edge AI',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
   themeColor: '#ffffff',
 };

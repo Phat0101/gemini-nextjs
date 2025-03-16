@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, MessageSquare, User, Video, X, LogOut, LogIn, UserPlus, Settings } from "lucide-react";
+import { Menu, MessageSquare, User, Video, X, LogOut, LogIn, UserPlus, Settings, CreditCard } from "lucide-react";
 import { UserButton, SignedIn, SignedOut, useClerk, useUser } from "@clerk/nextjs";
+import { SUBSCRIPTION_PLANS } from "@/lib/subscription";
 
 // Navigation items that require authentication
 const authenticatedNavItems = [
@@ -14,7 +15,7 @@ const authenticatedNavItems = [
     icon: <MessageSquare className="h-5 w-5" />,
   },
   {
-    name: "Live Interview",
+    name: "Interview Partner",
     href: "/live-interview",
     icon: <Video className="h-5 w-5" />,
   },
@@ -35,11 +36,60 @@ export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const { signOut } = useClerk();
   const { user } = useUser();
+  // Default to free plan with 0.25 credits
+  const [subscription, setSubscription] = useState({ plan: 'free', credits: 0.25 });
+  const [isLoading, setIsLoading] = useState(true);
 
   // Close sidebar when changing routes on mobile
   useEffect(() => {
     setIsOpen(false);
   }, [pathname]);
+
+  // Fetch subscription data for signed-in users
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/subscription');
+        
+        if (!response.ok) {
+          console.error('Failed to fetch subscription details');
+          return;
+        }
+        
+        const data = await response.json();
+        const planData = data.data || {};
+        
+        // Ensure we have credits data with fallbacks to plan defaults
+        const planType = planData.plan || 'free';
+        const planCredits = typeof planData.credits === 'number' ? planData.credits : 
+          (planType === 'free' ? SUBSCRIPTION_PLANS.FREE.credits : 
+           planType === 'basic' ? SUBSCRIPTION_PLANS.BASIC.credits : 
+           planType === 'premium' ? SUBSCRIPTION_PLANS.PREMIUM.credits : 0.25);
+        
+        
+        setSubscription({
+          plan: planType,
+          credits: planCredits
+        });
+      } catch (err) {
+        console.error('Error fetching subscription:', err);
+        // Set default values on error
+        setSubscription({
+          plan: 'free',
+          credits: 0.25 // Default free trial credits
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    if (user) {
+      fetchSubscription();
+    }
+  }, [user]);
 
   // Close sidebar when clicking outside on mobile
   useEffect(() => {
@@ -76,6 +126,15 @@ export default function Sidebar() {
       document.body.style.overflow = "auto";
     };
   }, [isOpen]);
+
+  // Helper to get plan name from plan type
+  const getPlanName = (planType: string): string => {
+    switch (planType) {
+      case 'basic': return SUBSCRIPTION_PLANS.BASIC.name;
+      case 'premium': return SUBSCRIPTION_PLANS.PREMIUM.name;
+      default: return SUBSCRIPTION_PLANS.FREE.name;
+    }
+  };
 
   return (
     <>
@@ -130,6 +189,32 @@ export default function Sidebar() {
               </div>
             </div>
           </SignedOut>
+
+          {/* Subscription information for signed-in users */}
+          <SignedIn>
+            <div className="p-4 border-b border-zinc-200">
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="h-5 w-5 text-blue-500" />
+                <h3 className="text-sm font-medium text-zinc-800">
+                  {getPlanName(subscription.plan)} Plan
+                </h3>
+                {subscription.plan === 'free' && (
+                  <Link
+                    href="/settings"
+                    className="ml-auto text-xs text-blue-600 hover:underline"
+                  >
+                    Upgrade
+                  </Link>
+                )}
+              </div>
+              <div className="bg-blue-50 px-3 py-2 rounded-md text-xs font-medium text-blue-700 flex items-center justify-between">
+                <span>{subscription.credits.toFixed(2)} Interview Credits</span>
+                {isLoading && (
+                  <div className="animate-spin h-3 w-3 border border-blue-700 rounded-full border-t-transparent"></div>
+                )}
+              </div>
+            </div>
+          </SignedIn>
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">

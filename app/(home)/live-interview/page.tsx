@@ -2,9 +2,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import InterviewScreenPreview from './InterviewScreenPreview';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Laptop, Mic, Eye, EyeOff, ScreenShare } from "lucide-react";
+import { Laptop, Mic, Eye, EyeOff, ScreenShare, AlertTriangle, CreditCard } from "lucide-react";
 import MarkdownPreview from '@uiw/react-markdown-preview';
 import { Button } from "@/components/ui/button";
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 // Custom styling for the MarkdownPreview component
 const markdownStyle = {
@@ -67,6 +69,7 @@ const SystemMessage = ({ children }: { children: React.ReactNode }) => (
 );
 
 export default function InterviewPage() {
+  const router = useRouter();
   const [messages, setMessages] = useState<{ type: 'user' | 'ai' | 'system', text: string }[]>([
     { 
       type: 'system', 
@@ -74,7 +77,7 @@ export default function InterviewPage() {
     },
     { 
       type: 'ai', 
-      text: "## How to Use This Assistant\n\nI'll help you prepare for interviews by suggesting answers. Here's how to use me effectively:\n\n- **Ask me interview questions** like \"Tell me about yourself\" or \"What's your greatest weakness?\"\n- **Practice your answers** after seeing my suggestions\n- **Show me interview questions** on your screen\n\nI'll only respond with answer suggestions when I hear an actual question. When you're practicing your own answer, I'll listen without interrupting.\n\nLet's start! What interview question would you like help with?" 
+      text: "## How to Use This Assistant\n\nI'll help you ace your interview by suggesting answers. Here's how to use me effectively:\n\n- **Ask me interview questions** like \"Tell me about yourself\" or \"What's your greatest weakness?\"\n- **Practice your answers** after seeing my suggestions\n- **Show me interview questions** on your screen\n\nI'll only respond with answer suggestions when I hear an actual question. When you're practicing your own answer, I'll listen without interrupting.\n\nLet's start! What interview question would you like help with?" 
     }
   ]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,6 +88,42 @@ export default function InterviewPage() {
     isScreenSharing: false,
     isAudioOnly: false
   });
+  
+  // Credit state
+  const [userCredits, setUserCredits] = useState<number | null>(null);
+  const [isLoadingCredits, setIsLoadingCredits] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Fetch user credits on page load
+  useEffect(() => {
+    const fetchUserCredits = async () => {
+      try {
+        setIsLoadingCredits(true);
+        const response = await fetch('/api/subscription');
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            // User is not authenticated, redirect to sign in
+            router.push('/sign-in');
+            return;
+          }
+          throw new Error('Failed to fetch subscription details');
+        }
+        
+        const data = await response.json();
+        const credits = data.data?.credits || 0;
+        setUserCredits(credits);
+      } catch (err) {
+        console.error('Error fetching subscription:', err);
+        setError('Unable to load your subscription information');
+        setUserCredits(0);
+      } finally {
+        setIsLoadingCredits(false);
+      }
+    };
+    
+    fetchUserCredits();
+  }, [router]);
   
   const handleTranscription = useCallback((transcription: string) => {
     if (transcription.trim()) {
@@ -120,6 +159,11 @@ export default function InterviewPage() {
     isAudioOnly: boolean 
   }) => {
     setStreamingStatus(status);
+  }, []);
+  
+  // Handle credit updates from the InterviewScreenPreview component
+  const handleCreditUpdate = useCallback((newCredits: number) => {
+    setUserCredits(newCredits);
   }, []);
   
   // Auto-scroll to bottom when new messages arrive
@@ -164,15 +208,79 @@ export default function InterviewPage() {
     };
   }, []);
 
+  // Show loading state
+  if (isLoadingCredits) {
+    return (
+      <div className="w-full h-full min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-3 p-8">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+          <p className="text-zinc-600">Loading your interview session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="w-full h-full min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-3 p-8 max-w-md text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500" />
+          <h1 className="text-xl font-bold text-zinc-800">Something went wrong</h1>
+          <p className="text-zinc-600">{error}</p>
+          <Button onClick={() => window.location.reload()} variant="outline" className="mt-2">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show insufficient credits state
+  if (userCredits !== null && userCredits <= 0) {
+    return (
+      <div className="w-full h-full min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4 p-8 max-w-md text-center">
+          <div className="p-3 rounded-full bg-amber-100">
+            <CreditCard className="h-8 w-8 text-amber-500" />
+          </div>
+          <h1 className="text-xl font-bold text-zinc-800">Insufficient Credits</h1>
+          <p className="text-zinc-600">
+            You need interview credits to use this feature. Please upgrade your subscription to continue.
+          </p>
+          <div className="flex gap-3 mt-2">
+            <Link href="/settings" passHref>
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                Upgrade Subscription
+              </Button>
+            </Link>
+            <Link href="/" passHref>
+              <Button variant="outline">
+                Go to Home
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full">
-      <header className="py-4 px-4 sm:py-6 sm:px-6 border-b border-zinc-200 bg-white text-center">
+      <header className="py-4 px-4 sm:py-6 sm:px-6  border-zinc-200 bg-white text-center">
         <h1 className="text-xl sm:text-2xl font-bold text-zinc-800">
-          Interview Answer Assistant
+          AI Interview Partner
         </h1>
         <p className="text-sm text-zinc-500 mt-1">
-          Share interview questions and get help crafting excellent answers
+          Ace your interview with the help of cutting-edge AI
         </p>
+        {/* Credits indicator */}
+        {userCredits !== null && (
+          <div className="mt-2 inline-flex items-center gap-1 px-3 py-1 bg-blue-50 rounded-full text-xs font-medium text-blue-700">
+            <CreditCard className="h-3 w-3" />
+            {userCredits.toFixed(2)} interview credits remaining
+          </div>
+        )}
       </header>
       
       <main className={`p-4 sm:p-6 grid grid-cols-1 ${isPreviewVisible ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-4 sm:gap-6 bg-zinc-50`}>
@@ -202,6 +310,8 @@ export default function InterviewPage() {
             onTranscription={handleTranscription}
             onModelResponse={handleModelResponse}
             onStatusChange={handleStreamingStatusChange}
+            userCredits={userCredits || 0}
+            onCreditUpdate={handleCreditUpdate}
           />
         </div>
 
