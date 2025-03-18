@@ -3,34 +3,90 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/prisma';
 import { upgradeSubscription } from '@/lib/subscription';
 
+// Verify environment variables are set
+if (!process.env.STRIPE_SECRET_KEY) {
+  console.error('Missing STRIPE_SECRET_KEY in environment variables');
+}
+
+if (!process.env.STRIPE_WEBHOOK_SECRET) {
+  console.error('Missing STRIPE_WEBHOOK_SECRET in environment variables');
+}
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
+// Log when the module is loaded (helpful for Vercel deployment debugging)
+console.log(`Stripe webhook module loaded. Webhook secret available: ${!!endpointSecret}`);
+
 // Helper to get raw request body as buffer
 async function getRawBody(req: NextRequest): Promise<Buffer> {
-  const chunks: Uint8Array[] = [];
-  const reader = req.body?.getReader();
-  
-  if (!reader) {
+  try {
+    const chunks: Uint8Array[] = [];
+    const reader = req.body?.getReader();
+    
+    if (!reader) {
+      console.error('No readable stream found in request body');
+      return Buffer.from('');
+    }
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    
+    return Buffer.concat(chunks);
+  } catch (error) {
+    console.error('Error getting raw body:', error);
     return Buffer.from('');
   }
-  
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
-  
-  return Buffer.concat(chunks);
 }
 
 export async function POST(req: NextRequest) {
   try {
+    // For Vercel debugging
+    console.log('Processing Stripe webhook POST request');
+    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+    
     // Get raw body for signature verification
     const rawBody = await getRawBody(req);
+    console.log(`Raw body length: ${rawBody.length} bytes`);
+    
+    if (!rawBody.length) {
+      console.error('Empty request body received');
+      return NextResponse.json(
+        { error: 'No request body received' },
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, stripe-signature'
+          }
+        }
+      );
+    }
     
     // Get the signature from headers
     const signature = req.headers.get('stripe-signature') || '';
+    
+    if (!signature) {
+      console.error('No Stripe signature in request headers');
+      return NextResponse.json(
+        { error: 'No Stripe signature provided' },
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, stripe-signature'
+          }
+        }
+      );
+    }
+    
+    // Log details for debugging
+    console.log(`Signature found, length: ${signature.length}`);
     
     let event;
     
@@ -44,10 +100,19 @@ export async function POST(req: NextRequest) {
       
       console.log(`✅ Webhook verified: ${event.type}`);
     } catch (err: unknown) {
-      console.error(`⚠️ Webhook signature verification failed:`, err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(`⚠️ Webhook signature verification failed: ${errorMessage}`);
+      
       return NextResponse.json(
-        { error: `Webhook Error: ${err}` },
-        { status: 400 }
+        { error: `Webhook Error: ${errorMessage}` },
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, stripe-signature'
+          }
+        }
       );
     }
     
@@ -94,7 +159,16 @@ export async function POST(req: NextRequest) {
             );
             
             console.log(`✅ Successfully added credits for user ${userIdFromMetadata} with plan ${plan}`);
-            return NextResponse.json({ received: true });
+            return NextResponse.json(
+              { received: true },
+              {
+                headers: {
+                  'Access-Control-Allow-Origin': '*',
+                  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                  'Access-Control-Allow-Headers': 'Content-Type, stripe-signature'
+                }
+              }
+            );
           }
           
           // 2. Second try: Find user by email
@@ -206,17 +280,48 @@ export async function POST(req: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
     
-    return NextResponse.json({ received: true });
+    return NextResponse.json(
+      { received: true },
+      {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, stripe-signature'
+        }
+      }
+    );
   } catch (err: unknown) {
     console.error(`❌ Error processing webhook:`, err);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, stripe-signature'
+        }
+      }
     );
   }
 }
 
-// Disable automatic body parsing
+// Handle OPTIONS request for CORS preflight
+export async function OPTIONS() {
+  return NextResponse.json(
+    {},
+    {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, stripe-signature',
+      },
+    }
+  );
+}
+
+// Ensure Next.js doesn't parse the body automatically
 export const config = {
   api: {
     bodyParser: false,
