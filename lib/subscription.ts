@@ -273,11 +273,11 @@ export async function getUserSubscription(clerkId: string) {
 }
 
 /**
- * Start an interview session and create a record in the database
+ * Start a new interview session for a user
  * @param clerkId The user's Clerk ID
- * @param jobPreparationId The ID of the job preparation
+ * @param jobPreparationId Optional job preparation ID to link with the session
  */
-export async function startInterviewSession(clerkId: string, jobPreparationId: string) {
+export async function startInterviewSession(clerkId: string, jobPreparationId?: string) {
   const user = await prisma.user.findUnique({
     where: { clerkId }
   });
@@ -286,12 +286,30 @@ export async function startInterviewSession(clerkId: string, jobPreparationId: s
     throw new Error('User not found');
   }
   
-  // Create a new interview session
+  // If no job preparation is provided, create a temporary one
+  let prepId = jobPreparationId;
+  
+  if (!prepId) {
+    // Create a temporary job preparation
+    const tempPrep = await prisma.jobPreparation.create({
+      data: {
+        title: 'General Interview Practice',
+        company: 'Practice Session',
+        description: 'General interview practice session',
+        notes: 'Auto-created for interview practice',
+        user: { connect: { id: user.id } }
+      }
+    });
+    
+    prepId = tempPrep.id;
+  }
+  
+  // Create the interview session
   const session = await prisma.interviewSession.create({
     data: {
       startTime: new Date(),
       status: 'in_progress',
-      jobPreparation: { connect: { id: jobPreparationId } },
+      jobPreparation: { connect: { id: prepId } },
       user: { connect: { id: user.id } }
     }
   });

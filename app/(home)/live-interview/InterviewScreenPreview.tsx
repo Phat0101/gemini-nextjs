@@ -33,10 +33,11 @@ export default function InterviewScreenPreview({
   const setupInProgressRef = useRef(false);
   const [isWebSocketReady, setIsWebSocketReady] = useState(false);
   const imageIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'establishing' | 'connecting' | 'connected'>('disconnected');
   const [isCaptureSupported, setIsCaptureSupported] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [isAudioOnly, setIsAudioOnly] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Credit tracking state
   const [interviewDuration, setInterviewDuration] = useState(0);
@@ -82,44 +83,20 @@ export default function InterviewScreenPreview({
   // Start an interview session by calling the API
   const startInterviewSession = async () => {
     try {
-      // First try to find or create a job preparation
-      const prepResponse = await fetch('/api/job-preparation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: 'General Interview Practice',
-          company: 'Practice Session',
-          description: 'General interview practice session',
-          notes: 'Auto-created for interview practice'
-        }),
-      });
-      
-      if (!prepResponse.ok) {
-        console.error('Failed to create job preparation');
-        setCreditError('Failed to set up interview. Please try again.');
-        return null;
-      }
-      
-      const prepData = await prepResponse.json();
-      const jobPreparationId = prepData.data.id;
-      
-      // Now start the interview session with the created job preparation
+      // Start the interview session
       const response = await fetch('/api/interview', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          jobPreparationId
-        }),
+        body: JSON.stringify({})
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Failed to start interview session:', errorData);
         setCreditError(errorData.error || 'Failed to start interview');
+        setConnectionStatus('disconnected');
         return null;
       }
 
@@ -129,6 +106,7 @@ export default function InterviewScreenPreview({
     } catch (error) {
       console.error('Error starting interview session:', error);
       setCreditError('Failed to start interview. Please try again.');
+      setConnectionStatus('disconnected');
       return null;
     }
   };
@@ -247,10 +225,15 @@ export default function InterviewScreenPreview({
       return;
     }
     
+    // Immediately show loading UI
     setCreditError(null);
+    setIsLoading(true);
+    setConnectionStatus('establishing');
+    
     const newSessionId = await startInterviewSession();
     if (!newSessionId) {
       console.error('Failed to start session');
+      setIsLoading(false);
       return;
     }
     
@@ -283,6 +266,7 @@ export default function InterviewScreenPreview({
       if (newSessionId) {
         endInterviewSession();
       }
+      setIsLoading(false);
     }
   };
 
@@ -292,10 +276,15 @@ export default function InterviewScreenPreview({
       return;
     }
     
+    // Immediately show loading UI
     setCreditError(null);
+    setIsLoading(true);
+    setConnectionStatus('establishing');
+    
     const newSessionId = await startInterviewSession();
     if (!newSessionId) {
       console.error('Failed to start session');
+      setIsLoading(false);
       return;
     }
     
@@ -365,6 +354,7 @@ export default function InterviewScreenPreview({
       if (newSessionId) {
         endInterviewSession();
       }
+      setIsLoading(false);
     }
   };
 
@@ -377,6 +367,7 @@ export default function InterviewScreenPreview({
     setIsStreaming(false);
     setIsScreenSharing(false);
     setIsAudioOnly(false);
+    setIsLoading(false);
     cleanupWebSocket();
     cleanupAudio();
     
@@ -402,7 +393,9 @@ export default function InterviewScreenPreview({
       return;
     }
 
+    // Always set to connecting when initializing WebSocket
     setConnectionStatus('connecting');
+    
     geminiWsRef.current = new InterviewGeminiWebSocket(
       (text) => {
         // Handle model text responses
@@ -624,12 +617,13 @@ export default function InterviewScreenPreview({
         )}
         
         {/* Connection Status Overlay */}
-        {isStreaming && connectionStatus !== 'connected' && (
+        {(isStreaming || isLoading) && connectionStatus !== 'connected' && (
           <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-lg backdrop-blur-sm z-10">
             <div className="text-center space-y-3">
               <Loader2 className="animate-spin h-8 w-8 text-white mx-auto" />
               <p className="text-white font-medium">
-                {connectionStatus === 'connecting' ? 'Connecting to AI...' : 'Disconnected'}
+                {connectionStatus === 'establishing' ? 'Establishing session...' : 
+                 connectionStatus === 'connecting' ? 'Connecting to AI...' : 'Disconnected'}
               </p>
               <p className="text-white/70 text-sm px-4">
                 Please wait while we establish a secure connection
@@ -659,18 +653,18 @@ export default function InterviewScreenPreview({
             <>
               <Button
                 onClick={startAudioOnly}
-                disabled={userCredits <= 0}
+                disabled={userCredits <= 0 || isLoading}
                 className="rounded-full h-12 px-4 shadow-lg bg-indigo-500 hover:bg-indigo-600 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Mic className="h-5 w-5" />
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Mic className="h-5 w-5" />}
                 <span>Audio Only</span>
               </Button>
               <Button
                 onClick={startScreenAndAudio}
-                disabled={userCredits <= 0}
+                disabled={userCredits <= 0 || isLoading}
                 className="rounded-full h-12 px-4 shadow-lg bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <ScreenShare className="h-5 w-5" />
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ScreenShare className="h-5 w-5" />}
                 <span>Screen + Audio</span>
               </Button>
             </>

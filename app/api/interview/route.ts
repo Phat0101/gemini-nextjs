@@ -26,31 +26,13 @@ export async function POST(req: NextRequest) {
       console.log('Failed to ensure user exists, trying direct access');
     }
     
-    const body = await req.json();
-    const { jobPreparationId } = body;
-    
-    if (!jobPreparationId) {
-      return NextResponse.json(
-        { error: 'Job preparation ID is required' },
-        { status: 400 }
-      );
-    }
-    
-    // Verify job prep exists and belongs to user
-    const jobPrep = await prisma.jobPreparation.findUnique({
-      where: {
-        id: jobPreparationId,
-        user: {
-          clerkId: userId
-        }
-      }
-    });
-    
-    if (!jobPrep) {
-      return NextResponse.json(
-        { error: 'Job preparation not found' },
-        { status: 404 }
-      );
+    // Extract jobPreparationId from request if available
+    let jobPreparationId: string | undefined;
+    try {
+      const body = await req.json();
+      jobPreparationId = body.jobPreparationId;
+    } catch {
+      // No body or invalid JSON, proceed without jobPreparationId
     }
     
     // Check if user has sufficient credits before starting
@@ -72,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Start the session
+    // Start the session, passing jobPreparationId if it exists
     const session = await startInterviewSession(userId, jobPreparationId);
     
     return NextResponse.json({

@@ -5,7 +5,7 @@ import { UserProfile } from "@clerk/nextjs";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { ArrowLeft, CreditCard, User, Settings } from "lucide-react";
-import { SubscriptionManager } from "@/app/components/subscription/SubscriptionManager";
+import { SubscriptionManager } from "@/components/SubscriptionManager";
 import { useEnsureUser } from "@/lib/hooks/useEnsureUser";
 
 export default function SettingsPage() {

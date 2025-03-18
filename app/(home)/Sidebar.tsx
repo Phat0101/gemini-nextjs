@@ -15,6 +15,11 @@ const authenticatedNavItems = [
     icon: <MessageSquare className="h-5 w-5" />,
   },
   {
+    name: "Profile",
+    href: "/profile",
+    icon: <User className="h-5 w-5" />,
+  },
+  {
     name: "Interview Partner",
     href: "/live-interview",
     icon: <Video className="h-5 w-5" />,

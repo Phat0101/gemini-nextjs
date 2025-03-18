@@ -19,7 +19,7 @@ export default function Page() {
             routing="path"
             path="/sign-in"
             signUpUrl="/sign-up"
-            afterSignInUrl="/live-interview"
+            fallbackRedirectUrl="/live-interview"
           />
         </div>
       </div>

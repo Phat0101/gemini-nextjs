@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import Sidebar from '../components/Sidebar';
+import Sidebar from './Sidebar';
 
 export default function RouteLayout({
   children,
