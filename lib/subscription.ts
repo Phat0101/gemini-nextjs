@@ -23,7 +23,7 @@ export const SUBSCRIPTION_PLANS = {
       'Basic AI feedback',
       'Interview recordings',
     ],
-    price: 9.99,
+    price: 24.99,
   },
   PREMIUM: {
     name: 'Premium',
@@ -37,7 +37,7 @@ export const SUBSCRIPTION_PLANS = {
       'Resume review',
       'Unlimited job preparations',
     ],
-    price: 19.99,
+    price: 74.99,
   }
 };
 
@@ -128,7 +128,7 @@ export async function upgradeSubscription(
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: {
-        credits: planCredits,
+        credits: user.credits + planCredits,
         subscription: {
           update: {
             plan: planType,
