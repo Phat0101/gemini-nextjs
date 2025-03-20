@@ -18,27 +18,16 @@ const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 // Log when the module is loaded (helpful for Vercel deployment debugging)
 console.log(`Stripe webhook module loaded. Webhook secret available: ${!!endpointSecret}`);
 
-// Helper to get raw request body as buffer
-async function getRawBody(req: NextRequest): Promise<Buffer> {
+// Modified helper to get raw request body as string (simpler for Vercel)
+async function getRawBody(req: NextRequest): Promise<string> {
   try {
-    const chunks: Uint8Array[] = [];
-    const reader = req.body?.getReader();
-    
-    if (!reader) {
-      console.error('No readable stream found in request body');
-      return Buffer.from('');
-    }
-    
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-    
-    return Buffer.concat(chunks);
+    // This approach works better on Vercel
+    const text = await req.text();
+    console.log(`Raw body retrieved, length: ${text.length} bytes`);
+    return text;
   } catch (error) {
     console.error('Error getting raw body:', error);
-    return Buffer.from('');
+    return '';
   }
 }
 
@@ -48,9 +37,9 @@ export async function POST(req: NextRequest) {
     console.log('Processing Stripe webhook POST request');
     console.log('Request headers:', Object.fromEntries(req.headers.entries()));
     
-    // Get raw body for signature verification
+    // Get raw body for signature verification (as string)
     const rawBody = await getRawBody(req);
-    console.log(`Raw body length: ${rawBody.length} bytes`);
+    console.log(`Raw body length: ${rawBody.length} characters`);
     
     if (!rawBody.length) {
       console.error('Empty request body received');
@@ -91,7 +80,7 @@ export async function POST(req: NextRequest) {
     let event;
     
     try {
-      // Verify webhook signature
+      // Verify webhook signature (using string rawBody instead of Buffer)
       event = stripe.webhooks.constructEvent(
         rawBody, 
         signature, 
@@ -319,10 +308,6 @@ export async function OPTIONS() {
       },
     }
   );
-}
-
-export async function GET() {
-  return NextResponse.json({ message: 'Hello, world!' });
 }
 
 // Ensure Next.js doesn't parse the body automatically
