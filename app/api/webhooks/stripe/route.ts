@@ -321,6 +321,10 @@ export async function OPTIONS() {
   );
 }
 
+export async function GET() {
+  return NextResponse.json({ message: 'Hello, world!' });
+}
+
 // Ensure Next.js doesn't parse the body automatically
 export const config = {
   api: {
