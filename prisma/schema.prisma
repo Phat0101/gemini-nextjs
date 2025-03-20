@@ -76,6 +76,8 @@ model Subscription {
   stripeSubscriptionId  String?
   stripePriceId         String?
   stripeCurrentPeriodEnd DateTime?
+  paymentMethodId       String?            // Store Stripe payment method ID
+  paymentMethodDetails  String?            // Store payment method details as JSON string
   plan                  SubscriptionPlan   @default(free)
   status                SubscriptionStatus @default(active)
   cancelAtPeriodEnd     Boolean            @default(false)

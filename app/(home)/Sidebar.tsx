@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, MessageSquare, User, Video, X, LogOut, LogIn, UserPlus, Settings, CreditCard } from "lucide-react";
+import { Menu, MessageSquare, User, Video, X, LogOut, LogIn, UserPlus, Settings } from "lucide-react";
 import { UserButton, SignedIn, SignedOut, useClerk, useUser } from "@clerk/nextjs";
 import { SUBSCRIPTION_PLANS } from "@/lib/subscription";
 
@@ -54,27 +54,27 @@ export default function Sidebar() {
   useEffect(() => {
     const fetchSubscription = async () => {
       if (!user) return;
-      
+
       try {
         setIsLoading(true);
         const response = await fetch('/api/subscription');
-        
+
         if (!response.ok) {
           console.error('Failed to fetch subscription details');
           return;
         }
-        
+
         const data = await response.json();
         const planData = data.data || {};
-        
+
         // Ensure we have credits data with fallbacks to plan defaults
         const planType = planData.plan || 'free';
-        const planCredits = typeof planData.credits === 'number' ? planData.credits : 
-          (planType === 'free' ? SUBSCRIPTION_PLANS.FREE.credits : 
-           planType === 'basic' ? SUBSCRIPTION_PLANS.BASIC.credits : 
-           planType === 'premium' ? SUBSCRIPTION_PLANS.PREMIUM.credits : 0.25);
-        
-        
+        const planCredits = typeof planData.credits === 'number' ? planData.credits :
+          (planType === 'free' ? SUBSCRIPTION_PLANS.FREE.credits :
+            planType === 'basic' ? SUBSCRIPTION_PLANS.BASIC.credits :
+              planType === 'premium' ? SUBSCRIPTION_PLANS.PREMIUM.credits : 0.25);
+
+
         setSubscription({
           plan: planType,
           credits: planCredits
@@ -90,7 +90,7 @@ export default function Sidebar() {
         setIsLoading(false);
       }
     };
-    
+
     if (user) {
       fetchSubscription();
     }
@@ -195,15 +195,39 @@ export default function Sidebar() {
             </div>
           </SignedOut>
 
+          {/* Navigation */}
+          <nav className="flex-1 p-4 space-y-1">
+            {/* Authenticated navigation items */}
+            <SignedIn>
+              {authenticatedNavItems.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${isActive
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-zinc-600 hover:bg-zinc-100"
+                      }`}
+                  >
+                    {item.icon}
+                    <span>{item.name}</span>
+                    {isActive && (
+                      <span className="ml-auto w-1.5 h-5 bg-blue-500 rounded-full" />
+                    )}
+                  </Link>
+                );
+              })}
+            </SignedIn>
+          </nav>
           {/* Subscription information for signed-in users */}
           <SignedIn>
-            <div className="p-4 border-b border-zinc-200">
+            <div className="p-4 border-t border-zinc-200">
               <div className="flex items-center gap-2 mb-2">
-                <CreditCard className="h-5 w-5 text-blue-500" />
                 <h3 className="text-sm font-medium text-zinc-800">
-                  {getPlanName(subscription.plan)} Plan
+                  {getPlanName(subscription.plan)} Package
                 </h3>
-                {subscription.plan === 'free' && (
+                {subscription.plan === 'free' || subscription.credits <= 0.5 && (
                   <Link
                     href="/settings"
                     className="ml-auto text-xs text-blue-600 hover:underline"
@@ -220,32 +244,6 @@ export default function Sidebar() {
               </div>
             </div>
           </SignedIn>
-
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1">
-            {/* Authenticated navigation items */}
-            <SignedIn>
-              {authenticatedNavItems.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${isActive
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-zinc-600 hover:bg-zinc-100"
-                      }`}
-                  >
-                    {item.icon}
-                    <span>{item.name}</span>
-                    {isActive && (
-                      <span className="ml-auto w-1.5 h-5 bg-blue-500 rounded-full" />
-                    )}
-                  </Link>
-                );
-              })}
-            </SignedIn>
-          </nav>
 
           {/* Footer with user info, settings, and sign out */}
           <div className="mt-auto">

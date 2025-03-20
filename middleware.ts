@@ -6,6 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhook/clerk",
+  "/api/webhooks/stripe",
   "/settings(.*)" // Allow settings routes for the UserProfile component
 ]);
 

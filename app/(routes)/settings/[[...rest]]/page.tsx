@@ -4,14 +4,15 @@ import { useState, useEffect } from "react";
 import { UserProfile } from "@clerk/nextjs";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { ArrowLeft, CreditCard, User, Settings } from "lucide-react";
+import { ArrowLeft, CreditCard, User, Settings, FileText } from "lucide-react";
 import { SubscriptionManager } from "@/components/SubscriptionManager";
+import { InvoiceHistory } from "@/components/InvoiceHistory";
 import { useEnsureUser } from "@/lib/hooks/useEnsureUser";
 
 export default function SettingsPage() {
   const { isLoaded, userId } = useAuth();
   const { isEnsuring, error } = useEnsureUser();
-  const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'settings'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'settings' | 'invoices'>('profile');
   
   // Ensure automatic account creation when user visits settings
   useEffect(() => {
@@ -60,6 +61,10 @@ export default function SettingsPage() {
     
     if (activeTab === 'subscription') {
       return <SubscriptionManager />;
+    }
+    
+    if (activeTab === 'invoices') {
+      return <InvoiceHistory />;
     }
     
     return (
@@ -118,6 +123,18 @@ export default function SettingsPage() {
                 >
                   <CreditCard className="h-5 w-5" />
                   Subscription
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setActiveTab('invoices')}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors
+                    ${activeTab === 'invoices' 
+                      ? 'bg-blue-50 text-blue-700' 
+                      : 'text-zinc-700 hover:bg-zinc-50'}`}
+                >
+                  <FileText className="h-5 w-5" />
+                  Invoices
                 </button>
               </li>
               <li>
