@@ -1,7 +1,7 @@
 {
   "headers": [
     {
-      "source": "/api/webhooks/stripe",
+      "source": "/api/webhooks/stripe(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Credentials", "value": "true" },
         { "key": "Access-Control-Allow-Origin", "value": "*" },
@@ -12,7 +12,7 @@
   ],
   "rewrites": [
     {
-      "source": "/api/webhooks/stripe",
+      "source": "/api/webhooks/stripe/(.*)",
       "destination": "/api/webhooks/stripe"
     }
   ]

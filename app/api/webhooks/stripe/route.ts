@@ -21,7 +21,6 @@ console.log(`Stripe webhook module loaded. Webhook secret available: ${!!endpoin
 // Modified helper to get raw request body as string (simpler for Vercel)
 async function getRawBody(req: NextRequest): Promise<string> {
   try {
-    // This approach works better on Vercel
     const text = await req.text();
     console.log(`Raw body retrieved, length: ${text.length} bytes`);
     return text;
@@ -35,7 +34,12 @@ export async function POST(req: NextRequest) {
   try {
     // For Vercel debugging
     console.log('Processing Stripe webhook POST request');
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+    console.log('Request method:', req.method);
+    console.log('Request URL:', req.url);
+    
+    // Log all headers for debugging
+    const headers = Object.fromEntries(req.headers.entries());
+    console.log('All request headers:', JSON.stringify(headers, null, 2));
     
     // Get raw body for signature verification (as string)
     const rawBody = await getRawBody(req);
