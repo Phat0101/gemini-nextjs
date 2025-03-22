@@ -36,7 +36,21 @@ export const InvoiceHistory = () => {
         }
 
         const data = await response.json();
-        setInvoices(data.invoices || []);
+        
+        // Debug log to check data received from API
+        console.log('Invoices data received:', data);
+        
+        // Check that invoices data is an array
+        if (data.invoices && Array.isArray(data.invoices)) {
+          console.log(`Found ${data.invoices.length} invoices`);
+          setInvoices(data.invoices);
+        } else {
+          console.error('Invalid invoices data format:', data);
+          // Handle case where invoices might not be an array
+          setInvoices(data.invoices && !Array.isArray(data.invoices) 
+            ? [data.invoices] // Convert single object to array
+            : []);
+        }
       } catch (err) {
         setError('Unable to load invoice history');
         console.error('Error fetching invoices:', err);
@@ -132,51 +146,63 @@ export const InvoiceHistory = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-zinc-200">
-            {invoices.map((invoice) => (
-              <tr key={invoice.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  {formatDate(invoice.created)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  {invoice.number}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  {formatAmount(invoice.amount_paid, invoice.currency)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                    ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 
-                      invoice.status === 'open' ? 'bg-yellow-100 text-yellow-800' : 
-                      'bg-zinc-100 text-zinc-800'}`}>
-                    {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-3">
-                    {invoice.hosted_invoice_url && (
-                      <a 
-                        href={invoice.hosted_invoice_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <ExternalLink className="h-5 w-5" />
-                      </a>
-                    )}
-                    {invoice.invoice_pdf && (
-                      <a 
-                        href={invoice.invoice_pdf} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <Download className="h-5 w-5" />
-                      </a>
-                    )}
-                  </div>
+            {invoices && invoices.length > 0 ? (
+              invoices.map((invoice, index) => (
+                <tr key={invoice.id || `invoice-${index}`}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {invoice.created ? formatDate(invoice.created) : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {invoice.number || `INV-${index}`}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {typeof invoice.amount_paid === 'number' 
+                      ? formatAmount(invoice.amount_paid, invoice.currency || 'usd') 
+                      : 'N/A'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                      ${invoice.status === 'paid' ? 'bg-green-100 text-green-800' : 
+                        invoice.status === 'open' ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-zinc-100 text-zinc-800'}`}>
+                      {invoice.status 
+                        ? invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1) 
+                        : 'Unknown'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex space-x-3">
+                      {invoice.hosted_invoice_url && (
+                        <a 
+                          href={invoice.hosted_invoice_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <ExternalLink className="h-5 w-5" />
+                        </a>
+                      )}
+                      {invoice.invoice_pdf && (
+                        <a 
+                          href={invoice.invoice_pdf} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Download className="h-5 w-5" />
+                        </a>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="px-6 py-4 text-center text-sm text-zinc-500">
+                  No invoice records found
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>

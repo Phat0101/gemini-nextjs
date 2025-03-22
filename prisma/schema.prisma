@@ -89,6 +89,21 @@ model Subscription {
   userId                String             @unique @db.ObjectId
 }
 
+// New model to track multiple Stripe customers per user
+model StripeCustomer {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  stripeCustomerId   String    @unique              // Unique Stripe customer ID
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  // Relation to User
+  user               User      @relation(fields: [userId], references: [id])
+  userId             String    @db.ObjectId
+
+  // Add an index to make queries by userId fast
+  @@index([userId])
+}
+
 enum SubscriptionPlan {
   free
   basic
@@ -119,6 +134,7 @@ model User {
   jobPreparations    JobPreparation[]
   interviewSessions  InterviewSession[]
   subscription       Subscription?
+  stripeCustomers    StripeCustomer[]   // New relation field to track multiple Stripe customers
   
   // Metadata
   lastActive         DateTime      @default(now())

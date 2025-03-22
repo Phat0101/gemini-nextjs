@@ -81,11 +81,6 @@ export default function Sidebar() {
         });
       } catch (err) {
         console.error('Error fetching subscription:', err);
-        // Set default values on error
-        setSubscription({
-          plan: 'free',
-          credits: 0.25 // Default free trial credits
-        });
       } finally {
         setIsLoading(false);
       }
@@ -227,7 +222,7 @@ export default function Sidebar() {
                 <h3 className="text-sm font-medium text-zinc-800">
                   {getPlanName(subscription.plan)} Package
                 </h3>
-                {subscription.plan === 'free' || subscription.credits <= 0.5 && (
+                {(subscription.plan === 'free' || subscription.credits <= 0.5) && (
                   <Link
                     href="/settings"
                     className="ml-auto text-xs text-blue-600 hover:underline"
@@ -236,7 +231,7 @@ export default function Sidebar() {
                   </Link>
                 )}
               </div>
-              <div className="bg-blue-50 px-3 py-2 rounded-md text-xs font-medium text-blue-700 flex items-center justify-between">
+              <div className="bg-blue-50 px-3 py-2 rounded-md text-xs font-medium text-blue-700 flex items-center justify-between ">
                 <span>{subscription.credits.toFixed(2)} Interview Credits</span>
                 {isLoading && (
                   <div className="animate-spin h-3 w-3 border border-blue-700 rounded-full border-t-transparent"></div>

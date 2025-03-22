@@ -37,10 +37,6 @@ export async function POST(req: NextRequest) {
     console.log('Request method:', req.method);
     console.log('Request URL:', req.url);
     
-    // Log all headers for debugging
-    const headers = Object.fromEntries(req.headers.entries());
-    console.log('All request headers:', JSON.stringify(headers, null, 2));
-    
     // Get raw body for signature verification (as string)
     const rawBody = await getRawBody(req);
     console.log(`Raw body length: ${rawBody.length} characters`);
@@ -140,6 +136,35 @@ export async function POST(req: NextRequest) {
           if (userIdFromMetadata) {
             console.log(`Processing payment for userId from metadata: ${userIdFromMetadata}`);
             
+            // Save the customer ID to our new StripeCustomer model
+            if (session.customer) {
+              const customerId = session.customer as string;
+              
+              // Check if this customer ID is already saved for the user
+              const existingCustomer = await prisma.stripeCustomer.findUnique({
+                where: { stripeCustomerId: customerId }
+              });
+              
+              if (!existingCustomer) {
+                // Get the user's internal DB ID from Clerk ID
+                const dbUser = await prisma.user.findUnique({
+                  where: { clerkId: userIdFromMetadata },
+                  select: { id: true }
+                });
+                
+                if (dbUser) {
+                  // Save the new customer ID
+                  await prisma.stripeCustomer.create({
+                    data: {
+                      stripeCustomerId: customerId,
+                      userId: dbUser.id
+                    }
+                  });
+                  console.log(`Added new Stripe customer ID ${customerId} for user ${userIdFromMetadata}`);
+                }
+              }
+            }
+            
             await upgradeSubscription(
               userIdFromMetadata, 
               plan,
@@ -171,7 +196,7 @@ export async function POST(req: NextRequest) {
           if (customerEmail) {
             // Find all users to check for a match
             const allUsers = await prisma.user.findMany({
-              select: { email: true, clerkId: true }
+              select: { id: true, email: true, clerkId: true }
             });
             
             console.log(`Searching for a match among ${allUsers.length} users with email: ${customerEmail}`);
@@ -183,6 +208,27 @@ export async function POST(req: NextRequest) {
             
             if (exactMatch) {
               console.log(`Found exact email match for user: ${exactMatch.clerkId}`);
+              
+              // Save the customer ID to our new StripeCustomer model
+              if (session.customer) {
+                const customerId = session.customer as string;
+                
+                // Check if this customer ID is already saved for the user
+                const existingCustomer = await prisma.stripeCustomer.findUnique({
+                  where: { stripeCustomerId: customerId }
+                });
+                
+                if (!existingCustomer) {
+                  // Save the new customer ID
+                  await prisma.stripeCustomer.create({
+                    data: {
+                      stripeCustomerId: customerId,
+                      userId: exactMatch.id
+                    }
+                  });
+                  console.log(`Added new Stripe customer ID ${customerId} for user ${exactMatch.clerkId}`);
+                }
+              }
               
               await upgradeSubscription(
                 exactMatch.clerkId, 

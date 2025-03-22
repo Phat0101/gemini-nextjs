@@ -12,7 +12,7 @@ import { useEnsureUser } from "@/lib/hooks/useEnsureUser";
 export default function SettingsPage() {
   const { isLoaded, userId } = useAuth();
   const { isEnsuring, error } = useEnsureUser();
-  const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'settings' | 'invoices'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'packages' | 'settings' | 'invoices'>('packages');
   
   // Ensure automatic account creation when user visits settings
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function SettingsPage() {
       );
     }
     
-    if (activeTab === 'subscription') {
+    if (activeTab === 'packages') {
       return <SubscriptionManager />;
     }
     
@@ -115,14 +115,14 @@ export default function SettingsPage() {
               </li>
               <li>
                 <button
-                  onClick={() => setActiveTab('subscription')}
+                  onClick={() => setActiveTab('packages')}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors
-                    ${activeTab === 'subscription' 
+                    ${activeTab === 'packages' 
                       ? 'bg-blue-50 text-blue-700' 
                       : 'text-zinc-700 hover:bg-zinc-50'}`}
                 >
                   <CreditCard className="h-5 w-5" />
-                  Subscription
+                  Packages
                 </button>
               </li>
               <li>
